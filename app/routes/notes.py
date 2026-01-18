@@ -32,7 +32,10 @@ def handle_notes():
         # tag_names should be a list of strings
         if isinstance(tag_names, str):
             tag_names = [t.strip() for t in tag_names.split(',')]
-            
+        
+        # Deduplicate tags
+        tag_names = list(set([t for t in tag_names if t]))
+
         for name in tag_names:
             name = name.strip()
             if not name: continue
@@ -40,6 +43,9 @@ def handle_notes():
             if not tag:
                 tag = Tag(name=name)
                 db.session.add(tag)
+                # Flush to ensure it's available for subsequent queries if multiple notes were being added (batch)
+                # Though here we only add one note, but good practice if logic changes
+                # db.session.flush() 
             note.tags.append(tag)
         
         db.session.add(note)
