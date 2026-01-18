@@ -1,0 +1,40 @@
+# Secrets and Environment Variables
+.env
+.env.local
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.manifest
+*.spec
+
+# Virtual Environments
+venv/
+env/
+.venv/
+.env/
+
+# Database
+*.sqlite
+*.sqlite3
+instance/
+*.db
+
+# Logs
+*.log
+*.log.*
+
+# IDEs and Editors
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
