@@ -23,7 +23,7 @@
         {% if messages %}
         {% for category, message in messages %}
         <div
-            style="background:white; padding:1rem; margin-bottom:0.5rem; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1); border-left:4px solid {{ '#10b981' if category == 'success' else '#ef4444' }}">
+            style="background:var(--white); padding:1rem; margin-bottom:0.8rem; border-radius:var(--radius-md); box-shadow:var(--shadow-flat); border-left:4px solid {{ 'var(--secondary)' if category == 'success' else '#ef4444' }}; color: var(--text); font-family: inherit; font-size: 0.9rem;">
             {{ message }}
         </div>
         {% endfor %}
