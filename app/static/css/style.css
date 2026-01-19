@@ -555,6 +555,50 @@ body {
     transition: all 0.2s;
 }
 
+/* Flash Messages */
+.flash-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.flash-message {
+    background: var(--white);
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-flat);
+    border-left: 4px solid var(--border-color);
+    color: var(--text);
+    font-size: 0.95rem;
+    min-width: 300px;
+    animation: slideIn 0.3s ease-out;
+}
+
+.flash-message.success {
+    border-left-color: var(--secondary);
+}
+
+.flash-message.error,
+.flash-message.danger {
+    border-left-color: #ef4444;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
 @media (max-width: 480px) {
     .auth-card {
         padding: 1.5rem;

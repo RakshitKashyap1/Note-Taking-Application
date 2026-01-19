@@ -18,12 +18,11 @@
     </div>
 
     <!-- Flash Messages Container -->
-    <div class="flash-container" style="position:fixed; top:20px; right:20px; z-index:2000;">
+    <div class="flash-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
-        <div
-            style="background:var(--white); padding:1rem; margin-bottom:0.8rem; border-radius:var(--radius-md); box-shadow:var(--shadow-flat); border-left:4px solid {{ 'var(--secondary)' if category == 'success' else '#ef4444' }}; color: var(--text); font-family: inherit; font-size: 0.9rem;">
+        <div class="flash-message {{ category }}">
             {{ message }}
         </div>
         {% endfor %}
