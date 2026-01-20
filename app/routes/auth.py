@@ -17,6 +17,18 @@ def register():
              flash('Please fill all fields', 'warning')
              return render_template('auth/register.html')
         
+        # Check if username or email already exists
+        user_exists = User.query.filter_by(username=username).first()
+        email_exists = User.query.filter_by(email=email).first()
+
+        if user_exists:
+            flash('Username already exists. Please choose a different one.', 'danger')
+            return redirect(url_for('auth.register'))
+        
+        if email_exists:
+            flash('Email already registered. Please log in.', 'danger')
+            return redirect(url_for('auth.login'))
+
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         user = User(username=username, email=email, password=hashed_password)
         try:
@@ -26,7 +38,8 @@ def register():
             return redirect(url_for('auth.login'))
         except Exception as e:
             db.session.rollback()
-            flash(f'Error: {e}', 'danger')
+            flash(f'An error occurred. Please try again.', 'danger')
+            print(f"Error: {e}")  # Print actual error to console for debugging
             
     return render_template('auth/register.html')
 
