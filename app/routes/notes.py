@@ -2,12 +2,12 @@ from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from app import db
 from app.models import Note, Tag
+from datetime import datetime
 
 notes = Blueprint('notes', __name__)
 
 @notes.route('/')
 @notes.route('/dashboard')
-@login_required
 def dashboard():
     return render_template('notes/dashboard.html', user=current_user)
 
@@ -50,7 +50,15 @@ def handle_notes():
         
         db.session.add(note)
         db.session.commit()
-        return jsonify({'message': 'Note created', 'id': note.id, 'title': note.title, 'date_posted': note.date_posted.strftime('%Y-%m-%d %H:%M')}), 201
+        db.session.add(note)
+        db.session.commit()
+        return jsonify({
+            'message': 'Note created', 
+            'id': note.id, 
+            'title': note.title, 
+            'date_posted': note.date_posted.strftime('%Y-%m-%d %H:%M'),
+            'date_updated': note.date_updated.strftime('%Y-%m-%d %H:%M')
+        }), 201
     
     # GET
     search_query = request.args.get('q')
@@ -59,6 +67,10 @@ def handle_notes():
     if search_query:
         query = query.filter((Note.title.ilike(f'%{search_query}%')) | (Note.content.ilike(f'%{search_query}%')))
     
+    tag_filter = request.args.get('tag')
+    if tag_filter:
+        query = query.filter(Note.tags.any(Tag.name == tag_filter))
+
     user_notes = query.order_by(Note.date_posted.desc()).all()
     
     notes_data = []
@@ -68,6 +80,7 @@ def handle_notes():
             'title': n.title,
             'content': n.content,
             'date_posted': n.date_posted.strftime('%Y-%m-%d %H:%M'),
+            'date_updated': n.date_updated.strftime('%Y-%m-%d %H:%M') if n.date_updated else n.date_posted.strftime('%Y-%m-%d %H:%M'),
             'tags': [t.name for t in n.tags]
         })
         
@@ -89,6 +102,7 @@ def note_detail(note_id):
         data = request.get_json()
         note.title = data.get('title', note.title)
         note.content = data.get('content', note.content)
+        note.date_updated = datetime.utcnow()
         
         if 'tags' in data:
             # Clear existing tags and set new ones? Or merge?

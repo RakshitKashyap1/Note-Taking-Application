@@ -17,13 +17,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Exit Intent / Unload Warning ---
+    // Warn user if they try to leave, to prevent data loss (though this app auto-saves/saves on submit, 
+    // it's a requested feature). We only warn if the form is dirty or maybe just general warning as asked.
+    // The request says: "give an alert that login or you will lose your data"
+    // Since we don't track "guest" state easily here without auth check, and the app requires login for dashboard,
+    // this might be intended for the auth pages or generally. 
+    // However, for logged-in users, data is saved. 
+    // If the user means "Guest users", we aren't handling guest mode. 
+    // Assuming this is for general unsaved changes in the modal.
+    let isDirty = false;
+    const inputs = document.querySelectorAll('#noteForm input, #noteForm textarea');
+    inputs.forEach(input => {
+        input.addEventListener('input', () => isDirty = true);
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty && document.getElementById('noteModal').classList.contains('active')) {
+            e.preventDefault();
+            e.returnValue = 'You have unsaved changes. Login or save to avoid losing data.';
+            return e.returnValue;
+        }
+    });
+
     // --- Active Link Handling ---
-    const navLinks = document.querySelectorAll('.nav-item');
+    const navLinks = document.querySelectorAll('.nav-item .nav-link');
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
-            navLinks.forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
-            // Filter logic can go here (e.g., show only favorites)
+            e.preventDefault(); // Prevent default anchor behavior
+
+            navLinks.forEach(l => l.parentElement.classList.remove('active'));
+            link.parentElement.classList.add('active');
+
+            const filter = link.getAttribute('data-filter');
+            if (filter === 'all') {
+                fetchNotes(); // Reset filter
+                // Update URL to /dashboard without query (optional)
+                window.history.pushState({}, '', '/dashboard');
+            } else if (filter === 'tags') {
+                // For now, maybe just show all notes but this could be a tag cloud view
+                // The user just requested "Filter notes by tag", which is supported via clicking tags.
+                // We'll keep showing all notes or maybe implement a side-panel for tags later.
+                fetchNotes();
+            }
         });
     });
 
@@ -43,25 +79,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchNotes();
 
-    function fetchNotes() {
-        fetch('/notes')
+    function fetchNotes(tag = null) {
+        let url = '/notes';
+        if (tag) {
+            url += `?tag=${encodeURIComponent(tag)}`;
+        }
+        fetch(url)
             .then(res => {
-                if (res.status === 401) window.location.href = '/login';
+                // If redirected to login page (HTML response) or 401
+                if (res.redirected && res.url.includes('login')) {
+                    // User not logged in, just return empty []
+                    return [];
+                }
+                if (res.status === 401) {
+                    return [];
+                }
                 return res.json();
             })
             .then(data => {
                 if (Array.isArray(data)) {
                     allNotes = data;
                     renderNotes(data);
+                } else {
+                    // Could happen if we returned [] manually or got error
+                    allNotes = [];
+                    renderNotes([]);
                 }
             })
-            .catch(err => console.error(err));
+            .catch(err => {
+                console.error(err);
+                // Render empty state on error
+                renderNotes([]);
+            });
     }
 
     function renderNotes(notes) {
         notesGrid.innerHTML = '';
-        if (notes.length === 0) {
-            notesGrid.innerHTML = '<p style="color:#9ca3af; grid-column: 1/-1; text-align:center; margin-top:2rem;">No notes found. Create one!</p>';
+        notesGrid.innerHTML = '';
+        if (!notes || notes.length === 0) {
+            notesGrid.innerHTML = '<p style="color:#9ca3af; grid-column: 1/-1; text-align:center; margin-top:2rem;">No notes found. Log in to create and save notes, or just explore the interface!</p>';
             return;
         }
 
@@ -69,22 +125,58 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'note-card';
 
-            // Format time (e.g. 3:30 PM)
-            // note.date_posted comes as YYYY-MM-DD HH:MM
-            const dateObj = new Date(note.date_posted);
-            let timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const createdDate = new Date(note.date_posted);
+            const updatedDate = new Date(note.date_updated);
+
+            const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            const createdStr = createdDate.toLocaleDateString([], options);
+            const updatedStr = updatedDate.toLocaleDateString([], options);
+
+            // Determine if updated
+            const isUpdated = note.date_updated && note.date_updated !== note.date_posted;
+            const timeDisplay = isUpdated ? `Updated: ${updatedStr}` : `Created: ${createdStr}`;
 
             card.innerHTML = `
                 <div class="card-header">
                     <h3 class="note-title">${note.title}</h3>
-                    <span class="note-time">${timeStr}</span>
+                    <div class="card-actions">
+                        <button class="icon-btn edit-btn" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button class="icon-btn delete-btn" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
                 </div>
+                <div style="font-size:0.75rem; color:#6b7280; margin-bottom:0.5rem;">${timeDisplay}</div>
                 <div class="note-preview">${note.content}</div>
                 <div class="card-tags">
-                    ${note.tags.map(t => `<span class="tag-badge">#${t}</span>`).join('')}
+                    ${note.tags.map(t => `<span class="tag-badge" data-tag="${t}">#${t}</span>`).join('')}
                 </div>
             `;
-            card.addEventListener('click', () => openEditModal(note));
+
+            // Event Delegation or direct binding
+            // Edit
+            card.querySelector('.edit-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditModal(note);
+            });
+            // Delete
+            card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleDelete(note.id);
+            });
+            // Card click (optional, maybe just open edit?)
+            card.addEventListener('click', (e) => {
+                // If clicked on tag, don't open modal
+                if (e.target.classList.contains('tag-badge')) {
+                    const tag = e.target.getAttribute('data-tag');
+                    fetchNotes(tag);
+                    window.history.pushState({}, '', `/dashboard?tag=${tag}`);
+                    return;
+                }
+                // Don't open if clicked on actions
+                if (e.target.closest('.card-actions')) return;
+
+                openEditModal(note);
+            });
+
             notesGrid.appendChild(card);
         });
     }
@@ -138,11 +230,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+
+                if (res.redirected && res.url.includes('login')) {
+                    alert('You must be logged in to save notes.');
+                    return;
+                }
+
                 if (res.ok) {
                     noteModal.classList.remove('active');
+                    resetModal(); // Reset form
+                    isDirty = false; // Reset dirty flag
                     fetchNotes();
                 } else {
-                    alert('Error saving note');
+                    if (res.status === 401) {
+                        alert('You must be logged in to save notes.');
+                    } else {
+                        const errData = await res.json();
+                        alert(errData.error || 'Error saving note');
+                    }
                 }
             } catch (err) { console.error(err); }
         });
