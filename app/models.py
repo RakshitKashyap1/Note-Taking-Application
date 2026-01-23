@@ -18,6 +18,7 @@ class User(db.Model, UserMixin):
     image_file = db.Column(db.String(20), nullable=False, default='default.jpg')
     password = db.Column(db.String(60), nullable=False)
     notes = db.relationship('Note', backref='author', lazy=True)
+    shared_notes = db.relationship('NoteShare', backref='user', lazy=True)
 
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
@@ -28,6 +29,7 @@ class Note(db.Model):
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     date_updated = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    reminder_date = db.Column(db.DateTime, nullable=True)
     is_pinned = db.Column(db.Boolean, default=False, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     tags = db.relationship('Tag', secondary=note_tags, lazy='subquery',
@@ -42,3 +44,14 @@ class Tag(db.Model):
 
     def __repr__(self):
         return f"Tag('{self.name}')"
+
+class NoteShare(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    permission = db.Column(db.String(10), default='read', nullable=False) # 'read' or 'write'
+    
+    note = db.relationship('Note', backref=db.backref('shared_with', lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f"NoteShare('NoteID:{self.note_id}', 'UserID:{self.user_id}', '{self.permission}')"
