@@ -22,11 +22,12 @@ def handle_notes():
         title = data.get('title')
         content = data.get('content')
         tag_names = data.get('tags', [])
+        is_pinned = data.get('is_pinned', False)
 
         if not title or not content:
             return jsonify({'error': 'Title and Content required'}), 400
 
-        note = Note(title=title, content=content, author=current_user)
+        note = Note(title=title, content=content, is_pinned=is_pinned, author=current_user)
         
         # Handle tags
         # tag_names should be a list of strings
@@ -56,6 +57,7 @@ def handle_notes():
             'message': 'Note created', 
             'id': note.id, 
             'title': note.title, 
+            'is_pinned': note.is_pinned,
             'date_posted': note.date_posted.strftime('%Y-%m-%d %H:%M'),
             'date_updated': note.date_updated.strftime('%Y-%m-%d %H:%M')
         }), 201
@@ -71,7 +73,7 @@ def handle_notes():
     if tag_filter:
         query = query.filter(Note.tags.any(Tag.name == tag_filter))
 
-    user_notes = query.order_by(Note.date_posted.desc()).all()
+    user_notes = query.order_by(Note.is_pinned.desc(), Note.date_posted.desc()).all()
     
     notes_data = []
     for n in user_notes:
@@ -79,6 +81,7 @@ def handle_notes():
             'id': n.id,
             'title': n.title,
             'content': n.content,
+            'is_pinned': n.is_pinned,
             'date_posted': n.date_posted.strftime('%Y-%m-%d %H:%M'),
             'date_updated': n.date_updated.strftime('%Y-%m-%d %H:%M') if n.date_updated else n.date_posted.strftime('%Y-%m-%d %H:%M'),
             'tags': [t.name for t in n.tags]
@@ -102,6 +105,7 @@ def note_detail(note_id):
         data = request.get_json()
         note.title = data.get('title', note.title)
         note.content = data.get('content', note.content)
+        note.is_pinned = data.get('is_pinned', note.is_pinned)
         note.date_updated = datetime.utcnow()
         
         if 'tags' in data:
@@ -128,5 +132,6 @@ def note_detail(note_id):
         'id': note.id, 
         'title': note.title, 
         'content': note.content,
+        'is_pinned': note.is_pinned,
         'tags': [t.name for t in note.tags]
     })

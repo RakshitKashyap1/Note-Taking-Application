@@ -22,6 +22,28 @@
     --shadow-hover: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
+[data-theme="dark"] {
+    --background: #1a1a1a;
+    --white: #2d2d2d;
+    --text: #e0e0e0;
+    --text-muted: #a0a0a0;
+    --border-color: #404040;
+    --shadow-subtle: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-flat: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.note-card.pinned {
+    border: 2px solid var(--accent);
+}
+
+.pin-btn {
+    color: var(--text-muted);
+}
+
+.pin-btn.active {
+    color: var(--accent);
+}
+
 .glass-panel {
     background: var(--white);
     /* keeping it flat as requested, but adding the class for compatibility */

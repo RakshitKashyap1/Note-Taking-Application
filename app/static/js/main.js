@@ -17,6 +17,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Theme Toggle ---
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const icon = themeToggleBtn ? themeToggleBtn.querySelector('i') : null;
+
+    // Check saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        if (icon) icon.classList.replace('fa-moon', 'fa-sun');
+    }
+
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('theme', 'light');
+                icon.classList.replace('fa-sun', 'fa-moon');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                icon.classList.replace('fa-moon', 'fa-sun');
+            }
+        });
+    }
+
+    // --- SimpleMDE Init ---
+    let simplemde = null;
+    if (document.getElementById("contentInput")) {
+        simplemde = new SimpleMDE({
+            element: document.getElementById("contentInput"),
+            spellChecker: false,
+            status: false,
+            placeholder: "Type your note here... (Markdown supported)"
+        });
+    }
+
     // --- Exit Intent / Unload Warning ---
     // Warn user if they try to leave, to prevent data loss (though this app auto-saves/saves on submit, 
     // it's a requested feature). We only warn if the form is dirty or maybe just general warning as asked.
@@ -115,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderNotes(notes) {
         notesGrid.innerHTML = '';
-        notesGrid.innerHTML = '';
         if (!notes || notes.length === 0) {
             notesGrid.innerHTML = '<p style="color:#9ca3af; grid-column: 1/-1; text-align:center; margin-top:2rem;">No notes found. Log in to create and save notes, or just explore the interface!</p>';
             return;
@@ -123,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         notes.forEach(note => {
             const card = document.createElement('div');
-            card.className = 'note-card';
+            card.className = `note-card ${note.is_pinned ? 'pinned' : ''}`;
 
             const createdDate = new Date(note.date_posted);
             const updatedDate = new Date(note.date_updated);
@@ -132,26 +168,48 @@ document.addEventListener('DOMContentLoaded', () => {
             const createdStr = createdDate.toLocaleDateString([], options);
             const updatedStr = updatedDate.toLocaleDateString([], options);
 
-            // Determine if updated
             const isUpdated = note.date_updated && note.date_updated !== note.date_posted;
             const timeDisplay = isUpdated ? `Updated: ${updatedStr}` : `Created: ${createdStr}`;
+
+            // Render Markdown
+            // Using marked.parse directly. Make sure marked is loaded.
+            let renderedContent = '';
+            try {
+                renderedContent = marked.parse(note.content);
+            } catch (e) {
+                renderedContent = note.content;
+            }
 
             card.innerHTML = `
                 <div class="card-header">
                     <h3 class="note-title">${note.title}</h3>
                     <div class="card-actions">
+                        <button class="icon-btn pin-btn ${note.is_pinned ? 'active' : ''}" title="${note.is_pinned ? 'Unpin' : 'Pin'}">
+                            <i class="fas fa-thumbtack"></i>
+                        </button>
                         <button class="icon-btn edit-btn" title="Edit"><i class="fas fa-edit"></i></button>
                         <button class="icon-btn delete-btn" title="Delete"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
                 <div style="font-size:0.75rem; color:#6b7280; margin-bottom:0.5rem;">${timeDisplay}</div>
-                <div class="note-preview">${note.content}</div>
+                <div class="note-preview" style="display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${renderedContent.replace(/<[^>]*>?/gm, '')}</div> 
                 <div class="card-tags">
                     ${note.tags.map(t => `<span class="tag-badge" data-tag="${t}">#${t}</span>`).join('')}
                 </div>
             `;
+            // I stripped tags for preview to avoid layout break.
+            // But user might want rich preview. 
+            // "Render formatted notes" -> Assuming full render in list might be too much?
+            // "Note Preview" usually is text.
+            // Let's strip HTML for preview or use a limited view.
+            // For now, stripping HTML is safer for a card preview.
 
-            // Event Delegation or direct binding
+            // Pin
+            card.querySelector('.pin-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                togglePin(note);
+            });
+
             // Edit
             card.querySelector('.edit-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -162,16 +220,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
                 handleDelete(note.id);
             });
-            // Card click (optional, maybe just open edit?)
+
             card.addEventListener('click', (e) => {
-                // If clicked on tag, don't open modal
                 if (e.target.classList.contains('tag-badge')) {
                     const tag = e.target.getAttribute('data-tag');
                     fetchNotes(tag);
                     window.history.pushState({}, '', `/dashboard?tag=${tag}`);
                     return;
                 }
-                // Don't open if clicked on actions
                 if (e.target.closest('.card-actions')) return;
 
                 openEditModal(note);
@@ -179,6 +235,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             notesGrid.appendChild(card);
         });
+    }
+
+    async function togglePin(note) {
+        const newStatus = !note.is_pinned;
+        try {
+            const res = await fetch(`/notes/${note.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_pinned: newStatus })
+            });
+            if (res.ok) {
+                fetchNotes();
+            }
+        } catch (err) { console.error(err); }
     }
 
     // Search
