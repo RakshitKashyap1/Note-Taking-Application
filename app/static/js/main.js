@@ -52,6 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
             status: false,
             placeholder: "Type your note here... (Markdown supported)"
         });
+
+        // SimpleMDE change event
+        simplemde.codemirror.on("change", () => {
+            isDirty = true;
+        });
     }
 
     // --- Exit Intent / Unload Warning ---
@@ -282,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const id = document.getElementById('noteId').value;
             const title = document.getElementById('titleInput').value;
-            const content = document.getElementById('contentInput').value;
+            const content = simplemde ? simplemde.value() : document.getElementById('contentInput').value;
             const tags = document.getElementById('tagsInput').value;
 
             const data = { title, content, tags };
@@ -326,7 +331,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function openEditModal(note) {
         document.getElementById('noteId').value = note.id;
         document.getElementById('titleInput').value = note.title;
-        document.getElementById('contentInput').value = note.content;
+        if (simplemde) {
+            simplemde.value(note.content);
+        } else {
+            document.getElementById('contentInput').value = note.content;
+        }
         document.getElementById('tagsInput').value = note.tags.join(', ');
 
         document.getElementById('modalTitle').innerText = 'Edit Note';
@@ -335,6 +344,9 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteNoteBtn.onclick = () => handleDelete(note.id);
         }
         noteModal.classList.add('active');
+
+        // Reset dirty flag after populating (SimpleMDE value change might set it to true)
+        setTimeout(() => isDirty = false, 10);
     }
 
     async function handleDelete(id) {
@@ -347,8 +359,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetModal() {
         noteForm.reset();
+        if (simplemde) simplemde.value('');
         document.getElementById('noteId').value = '';
         document.getElementById('modalTitle').innerText = 'Create Note';
         if (deleteNoteBtn) deleteNoteBtn.style.display = 'none';
+        isDirty = false;
     }
 });
